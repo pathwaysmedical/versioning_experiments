@@ -9,9 +9,11 @@ gemfile(true) do
   source "https://rubygems.org"
   gem "activerecord", "4.0.13"
   gem "sqlite3"
+  gem "activesupport", "4.0.13"
 end
 
 require "active_record"
+require "active_support"
 require "minitest/autorun"
 require "logger"
 require "securerandom"
@@ -49,68 +51,104 @@ class ModelVersioning
   end
 
   def find(uuid)
-    model.order(:created_at).find_by(_uuid: uuid)
+    all.find_by(_uuid: uuid)
   end
 
-  def update(uuid, args)
+  def update(instance, args)
     model.create(args.merge(
       _event: "update",
-      _uuid: uuid
+      _uuid: instance._uuid
     ))
   end
 
-  def draft(uuid, args)
+  def draft(instance, args)
     model.create(args.merge(
-      _event: "create",
-      _uuid: SecureRandom.uuid
+      _event: "draft",
+      _uuid: instance._uuid
     ))
+  end
+
+  def destroy(instance)
+    # unlike the other event types, 'destroy' stores the model as it was
+    # before the event
+
+    model.create(instance.attributes.except("created_at", "updated_at", "id").merge(
+      _event: "destroy",
+      _uuid: instance._uuid
+    ))
+  end
+
+  def all
+    scope = model.
+      where("#{table_name}._uuid NOT IN (select _uuid from #{table_name} where _event = 'destroy')").
+      where("#{table_name}._event != 'draft'")
+
+    case ActiveRecord::Base.connection
+    when ActiveRecord::ConnectionAdapters::SQLite3Adapter
+      scope.group("#{table_name}._uuid").
+        having("#{table_name}.created_at = MAX(#{table_name}.created_at)")
+    when ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
+      scope.select("DISTINCT ON(#{table_name}._uuid) *").
+        order("#{table_name}._uuid, #{table_name}.created_at DESC")
+    end
+  end
+
+  def table_name
+    model.table_name
   end
 
   def method_missing(m, *args, &block)
     model.send(m, *args, &block)
   end
+end
 
-  def destroy(uuid)
-    model.create(find(uuid).attributes.merge(
-      _event: "destroy",
-      _uui: uuid
-    ))
-  end
-
-  def all
-    # TODO:
-    # get the latest version for each uuid
-    # so long as it's not 'destroy'
+module VersionedModel
+  def versioned
+    @versioned ||= ModelVersioning.new(self)
   end
 end
 
-# class InstanceVersioning
-#   attr_reader :instance
-#
-#   def initialize(instance)
-#     @instance = instance
-#   end
-# end
-
-class VersionedModel < ActiveRecord::Base
-  def self.versioned
-    ModelVersioning.new(self)
-  end
-
-  # def versioned
-  #   @versioned = InstanceVersioning.new(self)
-  # end
-end
-
-class Entity < VersionedModel
+class Entity < ActiveRecord::Base
+  extend VersionedModel
 end
 
 class VersioningTest < Minitest::Test
-  def test_association_stuff
-    Entity.versioned.create(
+  def test_create
+    entity = Entity.versioned.create(
       content: "initial content"
     )
 
-    # TODO
+    assert_equal(entity, Entity.versioned.find(entity._uuid))
+  end
+
+  def test_update
+    entity = Entity.versioned.create(
+      content: "initial content"
+    )
+    updated_entity = Entity.versioned.update(
+      entity,
+      { content: "some updated content" }
+    )
+
+    assert_equal(updated_entity, Entity.versioned.find(updated_entity._uuid))
+  end
+
+  def test_draft
+    entity = Entity.versioned.create(
+      content: "initial content"
+    )
+    drafted_entity = Entity.versioned.draft(
+      entity,
+      { content: "some drafted content" }
+    )
+    assert_equal(entity, Entity.versioned.find(drafted_entity._uuid))
+  end
+
+  def test_destroy
+    entity = Entity.versioned.create(
+      content: "initial content"
+    )
+    Entity.versioned.destroy(entity)
+    assert_equal(nil, Entity.versioned.find(entity._uuid))
   end
 end
