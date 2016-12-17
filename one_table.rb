@@ -43,10 +43,10 @@ class ModelVersioning
     @model = model
   end
 
-  def create(args)
+  def create(args, uuid = SecureRandom.uuid)
     model.create(args.merge(
       _event: "create",
-      _uuid: SecureRandom.uuid
+      _uuid: uuid
     ))
   end
 
@@ -61,10 +61,10 @@ class ModelVersioning
     ))
   end
 
-  def draft(instance, args)
+  def draft(args, instance = nil)
     model.create(args.merge(
       _event: "draft",
-      _uuid: instance._uuid
+      _uuid: (instance.nil? ? SecureRandom.uuid : instance._uuid)
     ))
   end
 
@@ -76,6 +76,16 @@ class ModelVersioning
       _event: "destroy",
       _uuid: instance._uuid
     ))
+  end
+
+  def accept(draft, args)
+    existing_instance = find(draft._uuid)
+
+    if existing_instance.nil?
+      create(args, draft._uuid)
+    else
+      update(existing_instance, args)
+    end
   end
 
   def all
@@ -138,10 +148,23 @@ class VersioningTest < Minitest::Test
       content: "initial content"
     )
     drafted_entity = Entity.versioned.draft(
-      entity,
-      { content: "some drafted content" }
+      { content: "some drafted content" },
+      entity
     )
     assert_equal(entity, Entity.versioned.find(drafted_entity._uuid))
+  end
+
+  def test_accept_draft
+    drafted_entity = Entity.versioned.draft(
+      { content: "some drafted content" }
+    )
+
+    accepted = Entity.versioned.accept(
+      drafted_entity,
+      drafted_entity.attributes.except("created_at", "updated_at", "id")
+    )
+
+    assert_equal(accepted, Entity.versioned.find(accepted._uuid))
   end
 
   def test_destroy
