@@ -1,29 +1,4 @@
-begin
-  require "bundler/inline"
-rescue LoadError => e
-  $stderr.puts "Bundler version 1.10 or later is required. Please update your Bundler"
-  raise e
-end
-
-gemfile(true) do
-  source "https://rubygems.org"
-  gem "activerecord", "4.0.13"
-  gem "sqlite3"
-  gem "activesupport", "4.0.13"
-end
-
-require "active_record"
-require "active_support"
-require "minitest/autorun"
-require "logger"
-require "securerandom"
-
-# Ensure backward compatibility with Minitest 4
-Minitest::Test = MiniTest::Unit::TestCase unless defined?(Minitest::Test)
-
-# This connection will do for database-independent bug reports.
-ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-ActiveRecord::Base.logger = Logger.new(STDOUT)
+require_relative "setup"
 
 ActiveRecord::Schema.define do
   create_table :entities, force: true do |t|
@@ -89,18 +64,10 @@ class ModelVersioning
   end
 
   def all
-    scope = model.
+    model.
       where("#{table_name}._uuid NOT IN (select _uuid from #{table_name} where _event = 'destroy')").
-      where("#{table_name}._event != 'draft'")
-
-    case ActiveRecord::Base.connection
-    when ActiveRecord::ConnectionAdapters::SQLite3Adapter
-      scope.group("#{table_name}._uuid").
-        having("#{table_name}.created_at = MAX(#{table_name}.created_at)")
-    when ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
-      scope.select("DISTINCT ON(#{table_name}._uuid) *").
-        order("#{table_name}._uuid, #{table_name}.created_at DESC")
-    end
+      where("#{table_name}._event != 'draft'").
+      order("#{table_name}._uuid, #{table_name}.created_at DESC")
   end
 
   def table_name
