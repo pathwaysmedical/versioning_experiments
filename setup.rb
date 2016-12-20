@@ -7,7 +7,9 @@ end
 
 gemfile(true) do
   source "https://rubygems.org"
-  gem "activerecord", "4.0.13"
+  # use 4.2 since it begins jsonb support
+  gem "activerecord", "~> 4.2"
+  gem "activesupport", "~> 4.2"
   gem "pg"
 end
 
@@ -28,6 +30,7 @@ at_exit do
 end
 
 require "active_record"
+require "active_support"
 require "minitest/autorun"
 require "logger"
 require "securerandom"
