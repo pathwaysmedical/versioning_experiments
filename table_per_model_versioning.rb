@@ -65,9 +65,15 @@ class ModelVersioning
 
   def all
     model.
-      where("#{table_name}._uuid NOT IN (select _uuid from #{table_name} where _event = 'destroy')").
-      where("#{table_name}._event != 'draft'").
-      order("#{table_name}._uuid, #{table_name}.created_at DESC")
+      where(
+        "#{table_name}._uuid NOT IN (SELECT _uuid FROM #{table_name} "\
+        "WHERE #{table_name}._event = 'destroy')"
+      ).joins(
+        "LEFT JOIN (SELECT DISTINCT ON(_uuid) _uuid, id FROM #{table_name} "\
+        "WHERE #{table_name}._event != 'draft' "\
+        "ORDER BY #{table_name}._uuid, #{table_name}.created_at DESC) "\
+        " AS t1 ON t1.id = #{table_name}.id"
+      )
   end
 
   def table_name
