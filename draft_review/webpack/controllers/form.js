@@ -1,92 +1,116 @@
 import React from "react";
 
-
-const PreviousValue = (labeledPrevious) => {
-  <div style={{color: "orange"}}>
-    { `Was: ${labeledPrevious}`}
-  </div>
-}
-
-
 const Form = ({model, dispatch}) => {
-  const draft = model.ui.formData.draft
-  const published = model.ui.formData.published
+  const fieldsetData = _.assign(
+    { baseChangePath: [] },
+    model.ui.formData
+  )
 
   return(
     <form>
       <div>
         <label>Restaurant name</label>
-        <input
+        <ReviewableInput
           type="text"
-          value={draft.name}
-          onChange={_.partial(changeInputValue, dispatch, attrName)}
+          fieldsetData={fieldsetData}
+          dispatch={dispatch}
+          attrName="name"
         />
-        <PreviousValue
-          labeledPrevious={published.name}
+        <PublishedValue
+          fieldsetData={fieldsetData}
+          attrName="name"
         />
       </div>
       <div>
-        <select value={draft.price_key}
-          onChange={_.partial(changeInputValue, dispatch, "price_key")}
+        <ReviewableSelect
+          type="text"
+          fieldsetData={fieldsetData}
+          dispatch={dispatch}
+          attrName="price_key"
         >
           {
             _.map(model.app.prices, (label, value) => {
-              return(<option value={value}>{label}</option>);
+              return(<option value={value} key={value}>{label}</option>);
             })
           }
-        </select>
-        <PreviousValue
-          labeledPrevious={model.app.prices[published.price_key]}
+        </ReviewableSelect>
+        <PublishedValue
+          fieldsetData={fieldsetData}
+          attrName="price_key"
+          labelPrevious={(value) => model.app.prices[value]}
         />
       </div>
+      <br/>
+      <br/>
       <b>Menu Items</b>
       <ReviewableFieldsets
-        model={model}
+        fieldsetData={fieldsetData}
         attrName="menu_item_links"
-        handleCurrent={CurrentMenuItem}
+        handleDrafted={DraftedMenuItem}
         handleRemoved={RemovedMenuItem}
         dispatch={dispatch}
+        model={model}
       />
     </form>
   );
 }
 
-const BasePath = ["ui", "formData"];
+const ReviewableFieldsets = ({
+  fieldsetData,
+  attrName,
+  handleDrafted,
+  handleRemoved,
+  dispatch,
+  idAttr,
+  model
+}) => {
+  const _idAttr = idAttr || "id";
+  const drafts = fieldsetData.draft[attrName];
+  const publisheds = fieldsetData.published[attrName];
+  const actives = fieldsetData.active[attrName];
 
-const ReviewableFieldsets = ({model, attrName, handleCurrent, handleRemoved, dispatch}) => {
-  const drafts = _.get(model, BasePath.concat("draft", attrName));
-  const publisheds = _.get(model, BasePath.concat("published", attrName));
-  const draftIds = drafts.map(_.property("id"))
+  const draftIds = drafts.map(_.property(_idAttr))
 
   return(
     <div>
       {
-        drafts.map((draft, index) => {
+        actives.map((active, index) => {
           return React.createElement(
-            handleCurrent,
+            handleDrafted,
             {
-              model: model,
               attrName: attrName,
               dispatch: dispatch,
-              draft: draft,
               index: index,
               key: index,
-              published: publisheds.find((published) => published.id === draft.id)
+              model: model,
+              fieldsetData: {
+                draft: drafts.find((draft) => draft[_idAttr] === active[_idAttr]),
+                published: publisheds.
+                  find((published) => published[_idAttr] === active[_idAttr]),
+                active: active,
+                baseChangePath: fieldsetData.baseChangePath.concat(attrName, index)
+              }
             }
           )
         })
       }
+      <br/>
+      <b>Removed</b>
       {
-        publisheds.filter((published) => !_.includes(draftIds, published.id)).map((published) => {
+        publisheds.
+          filter((published) => !_.includes(draftIds, published[_idAttr])).
+          map((published, index) => {
+
           return React.createElement(
-            handleCurrent,
+            handleRemoved,
             {
-              model: model,
               attrName: attrName,
               dispatch: dispatch,
-              index: index,
               key: index,
-              published: published
+              fieldsetData: {
+                published: published
+              },
+              model: model
             }
           );
         })
@@ -95,78 +119,140 @@ const ReviewableFieldsets = ({model, attrName, handleCurrent, handleRemoved, dis
   );
 }
 
-const CurrentMenuItem = ({
-  model,
+const PublishedValue = ({fieldsetData, attrName, labelPrevious}) => {
+  const _labelPrevious = labelPrevious || _.identity
+
+
+  if (fieldsetData.published &&
+    fieldsetData.published[attrName] !== fieldsetData.active[attrName]){
+    return(
+      <div style={{color: "orange"}}>
+        { `Was: ${_labelPrevious(fieldsetData.published[attrName])}` }
+      </div>
+    )
+  }
+  else {
+    return <span></span>;
+  }
+}
+
+const ReviewableInput = (props) => {
+  var {dispatch, fieldsetData, attrName} = props;
+
+  return(
+    <input
+      value={fieldsetData.active[attrName]}
+      onChange={
+        _.partial(changeInputValue, dispatch, attrName, fieldsetData.basechangePath)
+      }
+      {..._.omit(props, ["dispatch", "fieldsetData", "attrName"])}
+    />
+  );
+};
+
+const ReviewableSelect = (props) => {
+  var {dispatch, fieldsetData, attrName, children} = props;
+
+  return(
+    <select value={fieldsetData.draft[attrName]}
+      onChange={
+        _.partial(changeInputValue, dispatch, attrName, fieldsetData.basechangePath)
+      }
+      {..._.omit(props, ["dispatch", "fieldsetData", "attrName", "children"])}
+    >
+      { children }
+    </select>
+  );
+};
+
+const DraftedMenuItem = ({
   dispatch,
-  draft,
-  published
+  fieldsetData,
+  attrName,
+  model
 }) => {
   return(
     <div>
-      <select value={draft.id}
-        onChange={_.partial(changeAssociatedId, dispatch, "menu_item")}
+      <ReviewableSelect
+        type="text"
+        fieldsetData={fieldsetData}
+        dispatch={dispatch}
+        attrName="id"
       >
         {
-          _.map(model.app.menu_items, (id, record) => {
-            return(<option key={id} value={id}>{label}</option>);
-          }).unshift(<option key={""} value={""}></option>)
+          [<option key={""} value={""}></option>].concat(..._.map(model.app.menu_items, (record, id) => {
+            return(<option key={id} value={id}>{record.name}</option>);
+          }))
         }
-      </select>
-      
+      </ReviewableSelect>
+      <div>
+        <label>Preparation method</label>
+        <ReviewableInput
+          type="text"
+          fieldsetData={fieldsetData}
+          dispatch={dispatch}
+          attrName="preparation_method"
+        />
+        <PublishedValue
+          fieldsetData={fieldsetData}
+          attrName="preparation_method"
+        />
+      </div>
+      <RemoveFieldset fieldsetData={fieldsetData} dispatch={dispatch}/>
+      <NewFieldsetAnnotation fieldsetData={fieldsetData}/>
+      <br/>
     </div>
   );
+};
+
+const RemoveFieldset = () => {
+  return <span></span>;
 }
 
-const changeAssociatedId = () => {
-
+const NewFieldsetAnnotation = ({fieldsetData}) => {
+  if (!fieldsetData.published){
+    return(<div style={{color: "orange"}}>Added</div>);
+  }
+  else {
+    return <span></span>;
+  }
 }
 
-// constraint on adding new fields -- no dupes
-// constraint on changing the identifying field -- no dupes
+const RemovedMenuItem = ({fieldsetData, model}) => {
+  return(
+    <div style={{color: "orange"}}>
+      <label>Menu Item: </label>
+      <RemovedField
+        fieldsetData={fieldsetData}
+        attrName={"id"}
+        labelPrevious={(value) => model.app.menu_items[value].name}
+      />
+      <br/>
+      <label>Preparation Method: </label>
+      <RemovedField
+        fieldsetData={fieldsetData}
+        attrName={"preparation_method"}
+      />
+      <hr/>
+    </div>
+  )
+};
 
-// const ReviewableSelect = ({model, attrName, label, dispatch, children}) => {
-//   return(
-//     <div>
-//       <select value={ _.get(model, BasePath.concat("draft", attrName)) }
-//         onChange={_.partial(changeInputValue, dispatch, attrName)}
-//       >
-//         { children }
-//       </select>
-//       <div style={{color: "orange"}}>
-//         {
-//           `Was: ${labelValue(attrName, _.get(model, BasePath.concat("published", attrName)), model)}`
-//         }
-//       </div>
-//     </div>
-//   )
-// }
-// const ReviewableInput = ({model, attrName, inputParams, label, dispatch}) => {
-//   return(
-//     <div>
-//       <label>{ label }</label>
-//       {
-//         React.createElement(
-//           "input",
-//           _.assign(
-//             {
-//               value: _.get(model, BasePath.concat("draft", attrName)),
-//               onChange: _.partial(changeInputValue, dispatch, attrName)
-//             },
-//             inputParams
-//           )
-//         )
-//       }
-//       <div style={{color: "orange"}}>
-//         { `Was: ${_.get(model, BasePath.concat("published", attrName))}`}
-//       </div>
-//     </div>
-//   );
-// }
+const RemovedField = ({fieldsetData, attrName, labelPrevious}) => {
+  const _labelPrevious = labelPrevious || _.identity;
 
-const changeInputValue = (dispatch, attrName, event) => {
+  return(
+    <span style={{color: "orange"}}>
+      { _labelPrevious(fieldsetData.published[attrName]) }
+    </span>
+  )
+}
+
+const changeInputValue = (dispatch, attrName, baseChangePath, event) => {
   dispatch({
     type: "CHANGE_INPUT_VALUE",
     proposed: event.target.value,
+    baseChangePath: baseChangePath,
     attrName: attrName
   });
 }

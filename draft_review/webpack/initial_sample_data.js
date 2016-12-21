@@ -1,15 +1,20 @@
+import _ from "lodash";
+
+const draftFormData = {
+  name: "Au Pied de Cochon",
+  price_key: 3,
+  has_takeout: false,
+  menu_item_links: [
+    { id: 3, preparation_method: "Grilled" },
+    { id: 2, preparation_method: "Barbecued" }
+  ]
+}
+
 const initialSampleData = {
   ui: {
     formData: {
-      draft: {
-        name: "Au Pied de Cochon",
-        price_key: 3,
-        has_takeout: false,
-        menu_item_links: [
-          { id: 3, preparation_method: "Grilled" },
-          { id: 2, preparation_method: "Barbecued" }
-        ]
-      },
+      draft: draftFormData,
+      active: _.cloneDeep(draftFormData),
       published: {
         name: "Au Pied Cochon typo",
         price_key: 1,

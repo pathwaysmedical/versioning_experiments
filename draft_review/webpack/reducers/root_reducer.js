@@ -5,14 +5,15 @@ const rootReducer = (model = initialSampleData, action) => {
     app: model.app,
     ui: {
       formData: {
-        draft: draft(model.ui.formData.draft, action),
+        active: active(model.ui.formData.draft, action),
+        draft: model.ui.formData.draft,
         published: model.ui.formData.published
       }
     }
   }
 }
 
-const draft = (model, action) => {
+const active = (model, action) => {
   switch(action.type){
   case "CHANGE_INPUT_VALUE":
     return _.assign(
