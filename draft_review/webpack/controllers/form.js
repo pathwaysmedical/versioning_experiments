@@ -47,7 +47,7 @@ const Form = ({model, dispatch}) => {
         fieldsetData={fieldsetData}
         attrName="menu_item_links"
         handleDrafted={DraftedMenuItem}
-        handleRemoved={RemovedMenuItem}
+        handleChanged={ChangedMenuItem}
         dispatch={dispatch}
         model={model}
       />
@@ -59,7 +59,7 @@ const ReviewableFieldsets = ({
   fieldsetData,
   attrName,
   handleDrafted,
-  handleRemoved,
+  handleChanged,
   dispatch,
   idAttr,
   model
@@ -70,6 +70,7 @@ const ReviewableFieldsets = ({
   const actives = fieldsetData.active[attrName];
 
   const draftIds = drafts.map(_.property(_idAttr))
+  const publishedIds = publisheds.map(_.property(_idAttr))
 
   return(
     <div>
@@ -102,14 +103,31 @@ const ReviewableFieldsets = ({
           map((published, index) => {
 
           return React.createElement(
-            handleRemoved,
+            handleChanged,
             {
               attrName: attrName,
               dispatch: dispatch,
               key: index,
-              fieldsetData: {
-                published: published
-              },
+              changedData: published,
+              model: model
+            }
+          );
+        })
+      }
+      <br/>
+      <b>Added</b>
+      {
+        drafts.
+          filter((draft) => !_.includes(publishedIds, draft[_idAttr])).
+          map((draft, index) => {
+
+          return React.createElement(
+            handleChanged,
+            {
+              attrName: attrName,
+              dispatch: dispatch,
+              key: index,
+              changedData: draft,
               model: model
             }
           );
@@ -199,7 +217,6 @@ const DraftedMenuItem = ({
         />
       </div>
       <RemoveFieldset fieldsetData={fieldsetData} dispatch={dispatch}/>
-      <NewFieldsetAnnotation fieldsetData={fieldsetData}/>
       <br/>
     </div>
   );
@@ -209,44 +226,16 @@ const RemoveFieldset = () => {
   return <span></span>;
 }
 
-const NewFieldsetAnnotation = ({fieldsetData}) => {
-  if (!fieldsetData.published && fieldsetData.draft){
-    return(<div style={{color: "orange"}}>Added</div>);
-  }
-  else {
-    return <span></span>;
-  }
-}
-
-const RemovedMenuItem = ({fieldsetData, model}) => {
+const ChangedMenuItem = ({changedData, model}) => {
   return(
-    <div style={{color: "orange"}}>
-      <label>Menu Item: </label>
-      <RemovedField
-        fieldsetData={fieldsetData}
-        attrName={"id"}
-        labelPrevious={(value) => model.app.menu_items[value].name}
-      />
-      <br/>
-      <label>Preparation Method: </label>
-      <RemovedField
-        fieldsetData={fieldsetData}
-        attrName={"preparation_method"}
-      />
+    <div>
+      <div>{`Menu Item: ${model.app.menu_items[changedData.id].name}`}</div>
+      <div>{`Preparation Method: ${changedData.preparation_method}`}</div>
       <hr/>
     </div>
   )
 };
 
-const RemovedField = ({fieldsetData, attrName, labelPrevious}) => {
-  const _labelPrevious = labelPrevious || _.identity;
-
-  return(
-    <span style={{color: "orange"}}>
-      { _labelPrevious(fieldsetData.published[attrName]) }
-    </span>
-  )
-}
 
 const changeInputValue = (dispatch, attrName, baseChangePath, event) => {
   dispatch({
