@@ -42,6 +42,7 @@ const Form = ({model, dispatch}) => {
       </div>
       <br/>
       <br/>
+      <hr/>
       <b>Menu Items</b>
       <ReviewableFieldsets
         fieldsetData={fieldsetData}
@@ -96,6 +97,7 @@ const ReviewableFieldsets = ({
         })
       }
       <br/>
+      <hr/>
       <b>Removed</b>
       {
         publisheds.
