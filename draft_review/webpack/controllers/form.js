@@ -143,7 +143,7 @@ const ReviewableInput = (props) => {
     <input
       value={fieldsetData.active[attrName]}
       onChange={
-        _.partial(changeInputValue, dispatch, attrName, fieldsetData.basechangePath)
+        _.partial(changeInputValue, dispatch, attrName, fieldsetData.baseChangePath)
       }
       {..._.omit(props, ["dispatch", "fieldsetData", "attrName"])}
     />
@@ -154,9 +154,9 @@ const ReviewableSelect = (props) => {
   var {dispatch, fieldsetData, attrName, children} = props;
 
   return(
-    <select value={fieldsetData.draft[attrName]}
+    <select value={fieldsetData.active[attrName]}
       onChange={
-        _.partial(changeInputValue, dispatch, attrName, fieldsetData.basechangePath)
+        _.partial(changeInputValue, dispatch, attrName, fieldsetData.baseChangePath)
       }
       {..._.omit(props, ["dispatch", "fieldsetData", "attrName", "children"])}
     >
@@ -210,7 +210,7 @@ const RemoveFieldset = () => {
 }
 
 const NewFieldsetAnnotation = ({fieldsetData}) => {
-  if (!fieldsetData.published){
+  if (!fieldsetData.published && fieldsetData.draft){
     return(<div style={{color: "orange"}}>Added</div>);
   }
   else {

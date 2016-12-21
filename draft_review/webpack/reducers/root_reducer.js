@@ -5,7 +5,7 @@ const rootReducer = (model = initialSampleData, action) => {
     app: model.app,
     ui: {
       formData: {
-        active: active(model.ui.formData.draft, action),
+        active: active(model.ui.formData.active, action),
         draft: model.ui.formData.draft,
         published: model.ui.formData.published
       }
@@ -16,14 +16,30 @@ const rootReducer = (model = initialSampleData, action) => {
 const active = (model, action) => {
   switch(action.type){
   case "CHANGE_INPUT_VALUE":
-    return _.assign(
-      {},
+    return updateAtPath(
       model,
-      { [action.attrName]: action.proposed }
-    )
+      action.baseChangePath.concat(action.attrName),
+      action.proposed
+    );
   default:
     return model;
   }
+}
+
+
+const updateAtPath = (model, path, proposed) => {
+  const cloned = _.clone(model)
+  const attrName = path.shift();
+
+
+  if (path.length === 0){
+    cloned[attrName] = proposed;
+  }
+  else {
+    cloned[attrName] = updateAtPath(cloned[attrName], path, proposed)
+  }
+
+  return cloned;
 }
 
 export default rootReducer;
