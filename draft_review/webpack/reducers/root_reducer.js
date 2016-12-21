@@ -21,6 +21,14 @@ const active = (model, action) => {
       action.baseChangePath.concat(action.attrName),
       action.proposed
     );
+  case "REMOVE_FIELDSET":
+    const attrName = action.path[0];
+
+    return _.assign(
+      {},
+      model,
+      { [ attrName ] : model[attrName].filter((elem, index) => index !== action.path[1]) }
+    )
   default:
     return model;
   }

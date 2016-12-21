@@ -222,9 +222,20 @@ const DraftedMenuItem = ({
   );
 };
 
-const RemoveFieldset = () => {
-  return <span></span>;
+const RemoveFieldset = ({fieldsetData, dispatch}) => {
+  return(
+    <div onClick={_.partial(removeFieldset, dispatch, fieldsetData.baseChangePath)}>
+      Remove
+    </div>
+  );
 }
+
+const removeFieldset = (dispatch, path) => {
+  dispatch({
+    type: "REMOVE_FIELDSET",
+    path: path
+  });
+};
 
 const ChangedMenuItem = ({changedData, model}) => {
   return(
