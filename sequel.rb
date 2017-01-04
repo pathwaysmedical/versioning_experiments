@@ -8,9 +8,10 @@ end
 gemfile(true) do
   source "https://rubygems.org"
   # use 4.2 since it begins jsonb support
-  gem "activerecord", "~> 4.2"
-  gem "activesupport", "~> 4.2"
+
+  gem "sequel", "~> 4.4"
   gem "pg"
+  gem "minitest"
 end
 
 db_config = {
@@ -23,19 +24,28 @@ db_config = {
   password: "",
 }
 
+
+require "sequel"
+require "logger"
+
+`createdb -O #{db_config[:username]} #{db_config[:database]}`
+
+DB = Sequel.connect(
+  "postgres://"\
+  "#{db_config[:username]}/"\
+  "#{db_config[:password]}@"\
+  "#{db_config[:host]}/"\
+  "#{db_config[:database]}"
+)
+
 at_exit do
-  ActiveRecord::Base.connection.disconnect!
+  DB.disconnect
 
   `dropdb #{db_config[:database]}`
 end
 
-require "active_record"
-require "active_support"
 require "minitest/autorun"
-require "logger"
 
 
-`createdb -O #{db_config[:username]} #{db_config[:database]}`
-
-ActiveRecord::Base.establish_connection(db_config)
-ActiveRecord::Base.logger = Logger.new(STDOUT)
+class SequelTest < MiniTest::Test
+end

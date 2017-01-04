@@ -1,7 +1,5 @@
 require_relative "activerecord_setup"
 
-########## MAIN ###############
-
 ActiveRecord::Schema.define do
   create_table :foos, force: true do |t|
     t.jsonb :bar_links
