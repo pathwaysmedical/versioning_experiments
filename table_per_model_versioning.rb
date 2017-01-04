@@ -1,4 +1,4 @@
-require_relative "setup"
+require_relative "activerecord_setup"
 
 # iid = "immutable id"
 # we reload the model every time so the iid gets returned
@@ -110,6 +110,10 @@ class Entity < ActiveRecord::Base
 end
 
 class VersioningTest < Minitest::Test
+  def setup
+    Entity.destroy_all
+  end
+
   def test_create
     entity = Entity.versioned.create(
       content: "initial content"

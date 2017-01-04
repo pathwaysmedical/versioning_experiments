@@ -1,4 +1,4 @@
-require_relative "setup"
+require_relative "activerecord_setup"
 
 ########## MAIN ###############
 
@@ -65,6 +65,12 @@ class Bin < ActiveRecord::Base
 end
 
 class DenormalizationTest < Minitest::Test
+  def setup
+    Foo.destroy_all
+    Bar.destroy_all
+    Bin.destroy_all
+  end
+
   def test_has_many
     5.times do
       Bar.create

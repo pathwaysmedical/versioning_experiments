@@ -1,4 +1,4 @@
-require_relative "setup"
+require_relative "activerecord_setup"
 
 ########## MAIN ###############
 
@@ -49,6 +49,11 @@ class Bar < ActiveRecord::Base
 end
 
 class DenormalizationTest < Minitest::Test
+  def setup
+    Foo.destroy_all
+    Bar.destroy_all
+  end
+
   def test_has_many
     5.times do
       Bar.create
@@ -86,8 +91,8 @@ class DenormalizationTest < Minitest::Test
     end
 
     assert_equal(
-      Foo.where("bar_links @> '[{\"id\": 1}]'"),
-      [ foo ]
+      [ foo ],
+      Foo.where("bar_links @> '[{\"id\": 1}]'")
     )
   end
 end
