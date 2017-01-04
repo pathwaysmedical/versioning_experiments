@@ -5,7 +5,7 @@ require_relative "activerecord_setup"
 # TODO: how can we avoid this gotcha?
 
 ActiveRecord::Schema.define do
-  create_table :entities, force: true do |t|
+  create_table :foos, force: true do |t|
     t.string :_iid
     t.string :_event
 
@@ -14,13 +14,11 @@ ActiveRecord::Schema.define do
     t.timestamps
   end
 
-  execute "CREATE SEQUENCE entities_iid_seq;"
-  execute "ALTER TABLE entities ALTER COLUMN _iid SET DEFAULT nextval('entities_iid_seq');"
+  execute "CREATE SEQUENCE foos_iid_seq;"
+  execute "ALTER TABLE foos ALTER COLUMN _iid SET DEFAULT nextval('foos_iid_seq');"
 end
 
-class ModelVersioning
-  attr_reader :model
-
+class VersionedModel
   def initialize(model)
     @model = model
   end
@@ -33,7 +31,7 @@ class ModelVersioning
     params.merge(_iid: iid) unless iid.nil?
 
 
-    model.create(params).reload
+    @model.create(params).reload
   end
 
   def find(iid)
@@ -41,7 +39,7 @@ class ModelVersioning
   end
 
   def update(instance, args)
-    model.create(args.merge(
+    @model.create(args.merge(
       _event: "update",
       _iid: instance._iid
     )).reload
@@ -54,14 +52,14 @@ class ModelVersioning
 
     params = params.merge(_iid: instance._iid) unless instance.nil?
 
-    model.create(params).reload
+    @model.create(params).reload
   end
 
   def destroy(instance)
     # unlike the other event types, 'destroy' stores the model as it was
     # before the event
 
-    model.create(instance.attributes.except("created_at", "updated_at", "id").merge(
+    @model.create(instance.attributes.except("created_at", "updated_at", "id").merge(
       _event: "destroy",
       _iid: instance._iid
     )).reload
@@ -78,7 +76,7 @@ class ModelVersioning
   end
 
   def all
-    model.
+    @model.
       where(
         "#{table_name}._iid NOT IN (SELECT _iid FROM #{table_name} "\
         "WHERE #{table_name}._event = 'destroy')"
@@ -91,79 +89,75 @@ class ModelVersioning
   end
 
   def table_name
-    model.table_name
+    @model.table_name
   end
 
   def method_missing(m, *args, &block)
-    model.send(m, *args, &block)
+    @model.send(m, *args, &block)
   end
 end
 
-module VersionedModel
-  def versioned
-    @versioned ||= ModelVersioning.new(self)
-  end
+class FooVersion < ActiveRecord::Base
+  self.table_name = "foos"
 end
 
-class Entity < ActiveRecord::Base
-  extend VersionedModel
-end
+Foo = VersionedModel.new(FooVersion)
 
 class VersioningTest < Minitest::Test
   def setup
-    Entity.destroy_all
+    FooVersion.destroy_all
   end
 
   def test_create
-    entity = Entity.versioned.create(
+    foo = Foo.create(
       content: "initial content"
     )
 
-    assert_equal(entity, Entity.versioned.find(entity._iid))
+    assert_equal(foo, Foo.find(foo._iid))
   end
 
   def test_update
-    entity = Entity.versioned.create(
+    foo = Foo.create(
       content: "initial content"
     )
 
-    updated_entity = Entity.versioned.update(
-      entity,
+    updated_foo = Foo.update(
+      foo,
       { content: "some updated content" }
     )
 
-    assert_equal(updated_entity, Entity.versioned.find(updated_entity._iid))
+    assert_equal(updated_foo, Foo.find(updated_foo._iid))
   end
 
   def test_draft
-    entity = Entity.versioned.create(
+    foo = Foo.create(
       content: "initial content"
     )
-    drafted_entity = Entity.versioned.draft(
+    drafted_foo = Foo.draft(
       { content: "some drafted content" },
-      entity
+      foo
     )
-    assert_equal(entity, Entity.versioned.find(drafted_entity._iid))
+    assert_equal(foo, Foo.find(drafted_foo._iid))
   end
 
   def test_accept_draft
-    drafted_entity = Entity.versioned.draft(
+    drafted_foo = Foo.draft(
       { content: "some drafted content" }
     )
 
-    accepted = Entity.versioned.accept(
-      drafted_entity,
-      drafted_entity.attributes.except("created_at", "updated_at", "id")
+    accepted = Foo.accept(
+      drafted_foo,
+      drafted_foo.attributes.except("created_at", "updated_at", "id")
     )
 
-    assert_equal(accepted, Entity.versioned.find(accepted._iid))
+    assert_equal(accepted, Foo.find(accepted._iid))
   end
 
   def test_destroy
-    entity = Entity.versioned.create(
+    foo = Foo.create(
       content: "initial content"
     )
-    Entity.versioned.destroy(entity)
-    assert_equal(nil, Entity.versioned.find(entity._iid))
+    Foo.destroy(foo)
+    assert_equal(nil, Foo.find(foo._iid))
   end
 end
