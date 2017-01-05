@@ -34,6 +34,18 @@ end
 class VersionedModel
   def initialize(model)
     @model = model
+
+    def @model.current_versions
+      where(
+        "#{table_name}._eid NOT IN (SELECT _eid FROM #{table_name} "\
+        "WHERE #{table_name}._event = 'destroy')"
+      ).joins(
+        "LEFT JOIN (SELECT DISTINCT ON(_eid) _eid, id FROM #{table_name} "\
+        "WHERE #{table_name}._event != 'draft' "\
+        "ORDER BY #{table_name}._eid, #{table_name}.created_at DESC) "\
+        " AS t1 ON t1.id = #{table_name}.id"
+      )
+    end
   end
 
   def create(args, eid = nil)
@@ -88,16 +100,7 @@ class VersionedModel
   end
 
   def all
-    @model.
-      where(
-        "#{table_name}._eid NOT IN (SELECT _eid FROM #{table_name} "\
-        "WHERE #{table_name}._event = 'destroy')"
-      ).joins(
-        "LEFT JOIN (SELECT DISTINCT ON(_eid) _eid, id FROM #{table_name} "\
-        "WHERE #{table_name}._event != 'draft' "\
-        "ORDER BY #{table_name}._eid, #{table_name}.created_at DESC) "\
-        " AS t1 ON t1.id = #{table_name}.id"
-      )
+    @model.current_versions
   end
 
   def table_name
