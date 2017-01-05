@@ -18,6 +18,19 @@ ActiveRecord::Schema.define do
   execute "ALTER TABLE foos ALTER COLUMN _eid SET DEFAULT nextval('foos_eid_seq');"
 end
 
+class VersionedActiveRecord < ActiveRecord::Base
+  self.abstract_class = true
+
+  validates :_event, presence: true
+
+  # can't validate on create since it's assigned by PG
+  validates :_eid, presence: true, on: :update
+
+  def attributes_without_version_metadata
+    attributes.except("created_at", "updated_at", "id")
+  end
+end
+
 class VersionedModel
   def initialize(model)
     @model = model
@@ -28,8 +41,7 @@ class VersionedModel
       _event: "create",
     )
 
-    params.merge(_eid: eid) unless eid.nil?
-
+    params = params.merge(_eid: eid) unless eid.nil?
 
     @model.create(params).reload
   end
@@ -59,7 +71,7 @@ class VersionedModel
     # unlike the other event types, 'destroy' stores the model as it was
     # before the event
 
-    @model.create(instance.attributes.except("created_at", "updated_at", "id").merge(
+    @model.create(instance.attributes_without_version_metadata.merge(
       _event: "destroy",
       _eid: instance._eid
     )).reload
@@ -97,7 +109,7 @@ class VersionedModel
   end
 end
 
-class FooVersion < ActiveRecord::Base
+class FooVersion < VersionedActiveRecord
   self.table_name = "foos"
 end
 
@@ -147,7 +159,7 @@ class VersioningTest < Minitest::Test
 
     accepted = Foo.accept(
       drafted_foo,
-      drafted_foo.attributes.except("created_at", "updated_at", "id")
+      drafted_foo.attributes_without_version_metadata
     )
 
     assert_equal(accepted, Foo.find(accepted._eid))
