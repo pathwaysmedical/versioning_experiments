@@ -1,12 +1,12 @@
 require_relative "activerecord_setup"
 
-# iid = "immutable id"
-# we reload the model every time so the iid gets returned
-# TODO: how can we avoid this gotcha?
+# eid = "entity id"
+
+# TODO: how to avoid reloading the model after create so the eid gets returned
 
 ActiveRecord::Schema.define do
   create_table :foos, force: true do |t|
-    t.string :_iid
+    t.string :_eid
     t.string :_event
 
     t.string :content
@@ -14,8 +14,8 @@ ActiveRecord::Schema.define do
     t.timestamps
   end
 
-  execute "CREATE SEQUENCE foos_iid_seq;"
-  execute "ALTER TABLE foos ALTER COLUMN _iid SET DEFAULT nextval('foos_iid_seq');"
+  execute "CREATE SEQUENCE foos_eid_seq;"
+  execute "ALTER TABLE foos ALTER COLUMN _eid SET DEFAULT nextval('foos_eid_seq');"
 end
 
 class VersionedModel
@@ -23,25 +23,25 @@ class VersionedModel
     @model = model
   end
 
-  def create(args, iid = nil)
+  def create(args, eid = nil)
     params = args.merge(
       _event: "create",
     )
 
-    params.merge(_iid: iid) unless iid.nil?
+    params.merge(_eid: eid) unless eid.nil?
 
 
     @model.create(params).reload
   end
 
-  def find(iid)
-    all.find_by(_iid: iid)
+  def find(eid)
+    all.find_by(_eid: eid)
   end
 
   def update(instance, args)
     @model.create(args.merge(
       _event: "update",
-      _iid: instance._iid
+      _eid: instance._eid
     )).reload
   end
 
@@ -50,7 +50,7 @@ class VersionedModel
       _event: "draft",
     )
 
-    params = params.merge(_iid: instance._iid) unless instance.nil?
+    params = params.merge(_eid: instance._eid) unless instance.nil?
 
     @model.create(params).reload
   end
@@ -61,15 +61,15 @@ class VersionedModel
 
     @model.create(instance.attributes.except("created_at", "updated_at", "id").merge(
       _event: "destroy",
-      _iid: instance._iid
+      _eid: instance._eid
     )).reload
   end
 
   def accept(draft, args)
-    existing_instance = find(draft._iid)
+    existing_instance = find(draft._eid)
 
     if existing_instance.nil?
-      create(args, draft._iid).reload
+      create(args, draft._eid).reload
     else
       update(existing_instance, args).reload
     end
@@ -78,12 +78,12 @@ class VersionedModel
   def all
     @model.
       where(
-        "#{table_name}._iid NOT IN (SELECT _iid FROM #{table_name} "\
+        "#{table_name}._eid NOT IN (SELECT _eid FROM #{table_name} "\
         "WHERE #{table_name}._event = 'destroy')"
       ).joins(
-        "LEFT JOIN (SELECT DISTINCT ON(_iid) _iid, id FROM #{table_name} "\
+        "LEFT JOIN (SELECT DISTINCT ON(_eid) _eid, id FROM #{table_name} "\
         "WHERE #{table_name}._event != 'draft' "\
-        "ORDER BY #{table_name}._iid, #{table_name}.created_at DESC) "\
+        "ORDER BY #{table_name}._eid, #{table_name}.created_at DESC) "\
         " AS t1 ON t1.id = #{table_name}.id"
       )
   end
@@ -113,7 +113,7 @@ class VersioningTest < Minitest::Test
       content: "initial content"
     )
 
-    assert_equal(foo, Foo.find(foo._iid))
+    assert_equal(foo, Foo.find(foo._eid))
   end
 
   def test_update
@@ -126,7 +126,7 @@ class VersioningTest < Minitest::Test
       { content: "some updated content" }
     )
 
-    assert_equal(updated_foo, Foo.find(updated_foo._iid))
+    assert_equal(updated_foo, Foo.find(updated_foo._eid))
   end
 
   def test_draft
@@ -137,7 +137,7 @@ class VersioningTest < Minitest::Test
       { content: "some drafted content" },
       foo
     )
-    assert_equal(foo, Foo.find(drafted_foo._iid))
+    assert_equal(foo, Foo.find(drafted_foo._eid))
   end
 
   def test_accept_draft
@@ -150,7 +150,7 @@ class VersioningTest < Minitest::Test
       drafted_foo.attributes.except("created_at", "updated_at", "id")
     )
 
-    assert_equal(accepted, Foo.find(accepted._iid))
+    assert_equal(accepted, Foo.find(accepted._eid))
   end
 
   def test_destroy
@@ -158,6 +158,6 @@ class VersioningTest < Minitest::Test
       content: "initial content"
     )
     Foo.destroy(foo)
-    assert_equal(nil, Foo.find(foo._iid))
+    assert_equal(nil, Foo.find(foo._eid))
   end
 end
